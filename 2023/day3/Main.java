@@ -1,128 +1,187 @@
 import java.io.*;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Scanner;
 
-public class Main 
-{
-    static ArrayList<NumIndex> deltas = new ArrayList<NumIndex>();
+public class Main {	
+	
+    private static final List<Point> DELTAS = Arrays.asList(
+        new Point(-1, 0), // UP 
+        new Point(-1, 1), // UP RIGHT
+        new Point(0, 1),  // RIGHT
+        new Point(1, 1),  // DOWN RIGHT
+        new Point(1, 0),  // DOWN
+        new Point(1, -1), // DOWN LEFT
+        new Point(0, -1), // LEFT
+        new Point(-1, -1) // UP LEFT
+    );
 
-    public static void main(String args[])
-    {
+	public static void main(String[] args) throws Exception {
         
-        deltas.add(new NumIndex(-1,0)); //Up
-        deltas.add(new NumIndex(-1,1)); //UpRight
-        deltas.add(new NumIndex(0,1)); //Right
-        deltas.add(new NumIndex(1,1)); //Downright
-        deltas.add(new NumIndex(1,0));//Down
-        deltas.add(new NumIndex(1,-1)); //DownLeft
-        deltas.add(new NumIndex(0,-1)); //Left
-        deltas.add(new NumIndex(-1,-1)); //UpLeft
-        
+        // Reading input...
+        List<List<String>> grid = new ArrayList<>(); // Declare an empty 2D List object
+        int sumPartNumbers = 0;
+        int sumGearRatios = 0;
+        try {
+            File file = new File("input.txt");
+            Scanner scanner = new Scanner(file);
 
-        File file = new File("input.txt");
-        Main go = new Main();
-        ArrayList<NumIndex> numIndex = new ArrayList<NumIndex>();
-        
-        ArrayList<Number> numbers;
-        String[] tempList = new String[140];
-        char[][] list = new char[140][140];
-        int count = 0;
-        //Read File
-        try
-        {
-            FileReader fr = new FileReader(file);
-            BufferedReader br = new BufferedReader(fr);
-            do
-            {
-                if(count == 140)
-                {
-                    break;
+            while (scanner.hasNextLine()) {
+                String line = scanner.nextLine();
+                List<String> grid_row = new ArrayList<>(); // New empty row for grid
+				String[] splitLine = line.split(""); // Split every symbol into its own string
+
+                for (String s : splitLine) { // Add symbols to the new grid row (enhanced for-loop)
+                    grid_row.add(s);
                 }
 
-                tempList[count] = br.readLine();
-
-                for(int i = 0; i < 140; i++)
-                {
-                    list[count][i] = tempList[count].charAt(i);
-                }
-                count++;
-
-            }while(list[count - 1] != null);
-            numbers = go.findNumbers(list);
-            System.out.print(numbers.size());
-            
-        }
-        catch(IOException e)
-        {
-            e.printStackTrace();
-        }
-
-
-    }
-
-    public int findParts(char[][] list)
-    {
-        
-
-        for(int i = 0; i < 140; i++)
-        {
-            for(int j = 0; j < 140; j++)
-            {
-                if(list[i][j] < 65 && list[i][j] > 34 && list[i][j] != '.') 
-                {
-                    if(list[i][j] < 58 && list[i][j] > 47)
-                    {
-                        
-                    }
-                    else
-                    {
-
-                        System.out.print(list[i][j]);
-                    }
-                    
-                }
-                
+                grid.add(grid_row);
             }
-            System.out.println();
+            scanner.close();
+
+        } catch (FileNotFoundException e) {
+            System.out.println("File not found: " + e.getMessage());
+            return;
         }
 
-        return 0;
-    }
-
-    public ArrayList<Number> findNumbers(char[][] list)
-    {
-        
-        int height = 140;
-        int width = 140;
-        ArrayList<Number> numbers = new ArrayList<>();
-        boolean readingNumber = false;
-        for(int i = 0; i < height; i++) 
+        // Parsing numbers...
+        List<Number> partNumbers = getPartNumbers(grid);
+        List<Point> gears = getGears(grid);
+        for(Number num : partNumbers)
         {
-            Number newNumber = new Number();
-            
-            for(int j = 0; j < width; j++)
-            {
-                
-                if(list[i][j] - '0' < 10)
-                {
+            sumPartNumbers += num.toInt();
+        }
+        System.out.println("Part 1: "+sumPartNumbers);
+        for(Point gear : gears)
+        {
+            sumGearRatios += getGearRatio(gear, partNumbers);
+        }
+        System.err.println("Part 2: "+sumGearRatios);
+
+	}
+
+    // Returns all Numbers found in a grid. A Number is composed of consecutive Digits (left to right)
+    public static List<Number> getNumbers(List<List<String>> grid) {
+        List<Number> numbers = new ArrayList<>();
+        
+        int height = grid.size(); // Number of rows
+        int width = grid.get(0).size(); // Number of columns
+        
+        for (int i = 0; i < height; i++) {
+            Number newNumber = new Number(); 
+            boolean readingNumber = false; // Will be true if the previous symbol in the row was an integer
+            for (int j = 0; j < width; j++) {
+                String symbol = grid.get(i).get(j);
+
+                if (symbol.matches("\\d{1}")) { // If symbol is a single-digit integer
                     readingNumber = true;
-                    newNumber.addDigits(new NumIndex(i, j));
-                    
-                }
-                else if(readingNumber && list[i][j] - '0' >= 10)
-                {
-                    numbers.add(newNumber);
+                    newNumber.addDigit(new Digit(new Point(i, j), symbol));
+
+                    // If we are on a digit at the end of a row, add the newNumber to the numbers list
+                    if (j == width - 1) {
+                        numbers.add(newNumber);
+                    }
+
+                } else if (readingNumber) { // Add newNumber to the numbers list if we passed its last digit
                     readingNumber = false;
+                    numbers.add(newNumber);
                     newNumber = new Number();
                 }
-                if(list[i][j] - '0' < 10 && j == width - 1)
-                {
-                    numbers.add(newNumber);
-                }
-                
             }
-            
         }
+
+        // Set the parentNumber field for each digit
+        for (Number num : numbers) {
+            for (Digit digit : num.getDigits()) {
+                digit.setParentNumber(num);
+            }
+        }
+
         return numbers;
     }
 
+    // Returns a list of Numbers which have at least one Digit adjacent to a non-numeric symbol (except ".")
+    public static List<Number> getPartNumbers(List<List<String>> grid) {
+        List<Number> partNumbers = new ArrayList<>();
+        List<Number> numbers = getNumbers(grid);
+        int height = grid.size();
+        int width = grid.get(0).size();
+
+        for(Number num : numbers)
+        {
+            digitLoop:
+            for(Digit digit : num.getDigits())
+            {
+                for(Point deltaPoint : DELTAS)
+                {
+                    Point adjPoint = (digit.getPosition()).add(deltaPoint);
+                    if(adjPoint.getRow() < 0 || adjPoint.getRow() >= height || adjPoint.getColumn() < 0 || adjPoint.getColumn() >= width)
+                    {
+                        continue;
+                    }
+                    String symbol = grid.get(adjPoint.getRow()).get(adjPoint.getColumn());
+                    if(!symbol.matches("[\\d.]"))
+                    {
+                        partNumbers.add(num);
+                        break digitLoop;
+                    }
+
+                }
+            }
+        }
+        
+        return partNumbers;
+    }
+    public static List<Point> getGears(List<List<String>> grid)
+    {
+        List<Point> gears = new ArrayList<>();
+        int height = grid.size();
+        int width = grid.get(0).size();
+        for(int i = 0; i < height; i++)
+        {
+            for(int j = 0; j < width; j++)
+            {
+                if((grid.get(i).get(j)).equals("*"))
+                {
+                    gears.add(new Point(i, j));
+                }
+            }
+        }
+        return gears;
+    }
+    public static int getGearRatio(Point gear, List<Number> partNumbers)
+    {
+        int count = 0;
+        List<Number> adjNumbers = new ArrayList<>();
+        for(Number num : partNumbers)
+        {
+            digitLoop:
+            for(Digit digit : num.getDigits())
+            {
+                for(Point deltaPoint : DELTAS)
+                {
+                    Point adjPoint = gear.add(deltaPoint);
+                    Point digitPoint = digit.getPosition();
+                    if(adjPoint.getRow() == digitPoint.getRow() && adjPoint.getColumn() == digitPoint.getColumn())
+                    {
+                        count++;
+                        adjNumbers.add(num);
+                        if(count > 2)
+                        {
+                            return 0;
+                        }
+                        break digitLoop;
+                    }
+                    
+                }
+            }
+        }
+      
+        if(count < 2)
+        {
+            return 0;
+        }
+        return (adjNumbers.get(0)).toInt() * (adjNumbers.get(1)).toInt();
+    }
 }
